@@ -165,7 +165,7 @@
           }
           const m = new AdvancedMarkerElement({ map, position: { lat: e.lat, lng: e.lng }, content: pinEl(), title: e.name });
           const it = { e, times, latest: times[0], m };
-          m.addListener('click', () => open(it));
+          m.addEventListener('gmp-click', () => open(it));
           markers.push(m);
           items.push(it);
         }
