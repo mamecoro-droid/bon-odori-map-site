@@ -83,10 +83,16 @@
       return d.firstChild;
     }
 
+    // Google マップで開く: 会場名があれば名前で探す（場所の名前が出る）。なければ座標で開く
+    function gmapsUrl(e) {
+      const q = e.venue ? [e.venue, e.pref + e.city].filter(Boolean).join(' ') : e.lat + ',' + e.lng;
+      return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q);
+    }
+
     function popup(e, times) {
       return `<div class="pop"><b>${esc(e.name)}</b><br>` + (e.venue ? `<span class="venue">${esc(e.venue)}</span><br>` : '') + `<span class="sub">${esc(place(e))}</span>` +
         (e.urls.length ? '<br>' + e.urls.map((u, i) => link(u, '関連HP' + (e.urls.length > 1 ? i + 1 : ''))).join(' ・ ') : '') +
-        `<br>${link('https://www.google.com/maps/search/?api=1&query=' + e.lat + ',' + e.lng, 'Google マップで開く')}` +
+        `<br>${link(gmapsUrl(e), 'Google マップで開く')}` +
         times.map((t) => `<div class="time"><span class="when">${esc(period(t))}</span>` +
           (t.songs.length ? '<ol class="songs">' + t.songs.map((s) =>
             `<li>${esc(s.name)}${s.dance ? ' <span class="sub">（' + esc(s.dance) + '）</span>' : ''}${s.video ? ' ' + link(s.video, '動画') : ''}</li>`).join('') + '</ol>' : '') +
@@ -163,7 +169,7 @@
             const text = [e.name, e.venue, e.pref, e.city, e.area, e.areaYomi].concat(...times.map((t) => t.songs.map((s) => s.name + s.yomi))).join(' ');
             if (!hira(text).includes(key)) continue;
           }
-          const m = new AdvancedMarkerElement({ map, position: { lat: e.lat, lng: e.lng }, content: pinEl(), title: e.name });
+          const m = new AdvancedMarkerElement({ map, position: { lat: e.lat, lng: e.lng }, content: pinEl(), title: e.name, gmpClickable: true });
           const it = { e, times, latest: times[0], m };
           m.addEventListener('gmp-click', () => open(it));
           markers.push(m);
