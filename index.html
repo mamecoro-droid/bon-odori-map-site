@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>盆踊り、民謡流し情報</title>
+  <meta name="description" content="盆踊り・民謡流しの日程と場所、セットリストの地図。まず新潟県から。">
+  <style>
+    :root { --bg: #fff; --fg: #222; --sub: #666; --line: #ddd; --accent: #b03a2e; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #1b1b1b; --fg: #eee; --sub: #aaa; --line: #333; --accent: #e07a6e; } }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+      font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; }
+    body { display: flex; flex-direction: column; }
+    header { display: flex; gap: 8px 12px; align-items: center; flex-wrap: wrap; padding: 8px 16px; border-bottom: 1px solid var(--line); }
+    h1 { font-size: 18px; margin: 0; }
+    select, input { font-size: 15px; padding: 4px 8px; max-width: 100%; }
+    #q { width: 220px; }
+    #count { color: var(--sub); font-size: 13px; }
+    main { flex: 1; display: flex; min-height: 0; }
+    #map { flex: 1; }
+    #list { width: 320px; overflow-y: auto; border-left: 1px solid var(--line); margin: 0; padding: 0; list-style: none; }
+    #list li { padding: 10px 16px; border-bottom: 1px solid var(--line); cursor: pointer; }
+    #list li:hover { background: rgba(127,127,127,.1); }
+    #list .d { font-size: 13px; color: var(--accent); }
+    #list .n { font-weight: bold; }
+    #list .p { font-size: 12px; color: var(--sub); }
+    #empty { padding: 16px; color: var(--sub); font-size: 14px; cursor: default; }
+    @media (max-width: 700px) {
+      main { flex-direction: column; }
+      #map { min-height: 55vh; }
+      #list { width: auto; border-left: 0; border-top: 1px solid var(--line); max-height: 45vh; }
+    }
+    /* 吹き出し（Google マップの InfoWindow の中身。地図の上なので常に明るい色） */
+    .pop { font-size: 13px; line-height: 1.6; color: #222; max-width: 290px; }
+    .pop b { font-size: 15px; }
+    .pop .venue { font-weight: bold; }
+    .pop .time { border-top: 1px solid #eee; margin-top: 6px; padding-top: 6px; }
+    .pop .when { color: #b03a2e; font-weight: bold; }
+    .pop .songs { margin: 4px 0; padding-left: 1.4em; }
+    .pop .cmt { white-space: pre-wrap; margin: 4px 0; }
+    .pop .sub { color: #666; font-size: 12px; }
+    .pin { display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.4)); cursor: pointer; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>盆踊り、民謡流し情報</h1>
+    <select id="region" aria-label="地域"></select>
+    <select id="year" aria-label="年"></select>
+    <select id="song" aria-label="曲"></select>
+    <input id="q" type="search" placeholder="名前・地名・曲名で探す（ひらがな可）" aria-label="探す">
+    <span id="count">読み込み中…</span>
+  </header>
+  <main>
+    <div id="map"></div>
+    <ul id="list"></ul>
+  </main>
+
+  <script>
+    // 設定。地図のデータはスプレッドシート（Apps Script の ?format=json）から毎回読む
+    const DATA_URL = 'https://script.google.com/macros/s/AKfycbyY3-EEqumnL44_i4nZ5XQrvUSBpWZtWadCpmKMAF9sXaRvMTy55PNorHDEwU9l8xXR7A/exec?format=json';
+    // Google マップのキー（このサイト〈mamecoro-droid.github.io〉でだけ使えるよう Google Cloud で制限してある）とマップID
+    const MAPS_KEY = 'AIzaSyAHAkcpmeySq2kS8S2GEiAFkSI7TzkL_fU';
+    const MAP_ID = '854cacd97c179959c6edbae5';
+
+    // Google マップの読み込み（Google の公式の読み込み方）
+    (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
+      key: MAPS_KEY, v: 'weekly', language: 'ja', region: 'JP',
+    });
+
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const hira = (s) => String(s).replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60)).replace(/\s/g, '').toLowerCase();
+    const md = (s) => Number(s.slice(5, 7)) + '/' + Number(s.slice(8, 10));
+    const hours = (t) => (t.startTime || t.endTime ? ' ' + (t.startTime || '') + '〜' + (t.endTime || '') : '');
+    const period = (t) => t.year + '年 ' + md(t.start) + (t.end && t.end !== t.start ? '〜' + md(t.end) : '') + hours(t);
+    const place = (e) => [e.pref, e.city, e.area + (e.area && e.areaYomi ? '（' + e.areaYomi + '）' : '')].filter(Boolean).join(' ');
+    const link = (u, text) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(text)}</a>`;
+
+    // ピン（しずく形。先端が場所を指す）
+    function pinEl() {
+      const d = document.createElement('div');
+      d.innerHTML = '<svg class="pin" width="30" height="42" viewBox="-1 -1 30 42"><path d="M14 0C6.3 0 0 6.2 0 13.9 0 24.3 14 40 14 40s14-15.7 14-26.1C28 6.2 21.7 0 14 0z" fill="#b03a2e" stroke="#fff" stroke-width="2"/><circle cx="14" cy="14" r="5" fill="#fff"/></svg>';
+      return d.firstChild;
+    }
+
+    function popup(e, times) {
+      return `<div class="pop"><b>${esc(e.name)}</b><br>` + (e.venue ? `<span class="venue">${esc(e.venue)}</span><br>` : '') + `<span class="sub">${esc(place(e))}</span>` +
+        (e.urls.length ? '<br>' + e.urls.map((u, i) => link(u, '関連HP' + (e.urls.length > 1 ? i + 1 : ''))).join(' ・ ') : '') +
+        `<br>${link('https://www.google.com/maps/search/?api=1&query=' + e.lat + ',' + e.lng, 'Google マップで開く')}` +
+        times.map((t) => `<div class="time"><span class="when">${esc(period(t))}</span>` +
+          (t.songs.length ? '<ol class="songs">' + t.songs.map((s) =>
+            `<li>${esc(s.name)}${s.dance ? ' <span class="sub">（' + esc(s.dance) + '）</span>' : ''}${s.video ? ' ' + link(s.video, '動画') : ''}</li>`).join('') + '</ol>' : '') +
+          (t.comment ? `<div class="cmt">${esc(t.comment)}</div>` : '') +
+          (t.urls.length ? t.urls.map((u, i) => link(u, '情報元' + (t.urls.length > 1 ? i + 1 : ''))).join(' ・ ') + '<br>' : '') +
+          (t.provider ? `<span class="sub">情報提供: ${esc(t.provider)}</span>` : '') +
+          '</div>').join('') + '</div>';
+    }
+
+    async function start() {
+      const countEl = document.getElementById('count');
+      let DATA;
+      try {
+        const res = await fetch(DATA_URL);
+        DATA = await res.json();
+      } catch (err) {
+        countEl.textContent = '情報を読み込めませんでした。時間をおいて再読み込みしてください。';
+        return;
+      }
+      const { Map, InfoWindow } = await google.maps.importLibrary('maps');
+      const { AdvancedMarkerElement } = await google.maps.importLibrary('marker');
+      const { LatLngBounds } = await google.maps.importLibrary('core');
+
+      const map = new Map(document.getElementById('map'), {
+        center: { lat: 37.5, lng: 138.8 }, zoom: 8, mapId: MAP_ID, // 新潟県あたり
+        gestureHandling: 'greedy', streetViewControl: true, mapTypeControl: true, fullscreenControl: true,
+      });
+      const info = new InfoWindow();
+      let markers = [];
+
+      const regionSel = document.getElementById('region');
+      const yearSel = document.getElementById('year');
+      const songSel = document.getElementById('song');
+      const q = document.getElementById('q');
+      regionSel.innerHTML = Object.keys(DATA.regions).map((r) => `<option>${esc(r)}</option>`).join('');
+      regionSel.value = DATA.defaultRegion;
+      yearSel.innerHTML = DATA.years.map((y) => `<option value="${y}">${y}年</option>`).join('') + '<option value="">すべての年</option>';
+
+      const inRegion = (e) => !DATA.regions[regionSel.value] || DATA.regions[regionSel.value].includes(e.pref);
+      const timesOf = (e) => e.times.filter((t) => !yearSel.value || String(t.year) === yearSel.value);
+
+      // 曲の一覧: 今の地域・年のセットリストに出てくる曲（辞書で決まった曲だけ）。多い順
+      function fillSongs() {
+        const keep = songSel.value;
+        const count = {};
+        DATA.events.filter(inRegion).forEach((e) => timesOf(e).forEach((t) => t.songs.forEach((s) => {
+          if (!s.id) return;
+          count[s.id] = count[s.id] || { name: s.name, yomi: s.yomi || s.name, n: 0 };
+          count[s.id].n++;
+        })));
+        const ids = Object.keys(count).sort((a, b) => count[b].n - count[a].n || count[a].yomi.localeCompare(count[b].yomi, 'ja'));
+        songSel.innerHTML = '<option value="">すべての曲</option>' +
+          ids.map((id) => `<option value="${esc(id)}">${esc(count[id].name)}（${count[id].n}）</option>`).join('');
+        songSel.value = ids.includes(keep) ? keep : '';
+      }
+
+      function open(it) {
+        info.setContent(popup(it.e, it.times));
+        info.open({ anchor: it.m, map });
+      }
+
+      function render() {
+        markers.forEach((m) => { m.map = null; });
+        markers = [];
+        info.close();
+        const key = hira(q.value);
+        const items = [];
+        for (const e of DATA.events) {
+          if (!inRegion(e)) continue;
+          let times = timesOf(e);
+          if (songSel.value) times = times.filter((t) => t.songs.some((s) => s.id === songSel.value));
+          if (!times.length) continue;
+          if (key) {
+            const text = [e.name, e.venue, e.pref, e.city, e.area, e.areaYomi].concat(...times.map((t) => t.songs.map((s) => s.name + s.yomi))).join(' ');
+            if (!hira(text).includes(key)) continue;
+          }
+          const m = new AdvancedMarkerElement({ map, position: { lat: e.lat, lng: e.lng }, content: pinEl(), title: e.name });
+          const it = { e, times, latest: times[0], m };
+          m.addListener('click', () => open(it));
+          markers.push(m);
+          items.push(it);
+        }
+        // 一覧は日付順（月日で並べる）
+        items.sort((a, b) => a.latest.start.slice(5).localeCompare(b.latest.start.slice(5)) || a.e.name.localeCompare(b.e.name, 'ja'));
+        const list = document.getElementById('list');
+        list.innerHTML = items.length
+          ? items.map((it, i) => `<li data-i="${i}"><div class="d">${esc(period(it.latest))}</div>` +
+              `<div class="n">${esc(it.e.name)}</div><div class="p">${esc([it.e.venue, place(it.e)].filter(Boolean).join('・'))}</div></li>`).join('')
+          : '<li id="empty">' + (DATA.events.length ? '当てはまる情報がありません。' : 'まだ情報が登録されていません。') + '</li>';
+        list.querySelectorAll('li[data-i]').forEach((li) => li.addEventListener('click', () => {
+          const it = items[li.dataset.i];
+          map.panTo({ lat: it.e.lat, lng: it.e.lng });
+          map.setZoom(15);
+          open(it);
+        }));
+        countEl.textContent = items.length + '件';
+        if (items.length === 1) { map.setCenter({ lat: items[0].e.lat, lng: items[0].e.lng }); map.setZoom(13); }
+        else if (items.length) {
+          const b = new LatLngBounds();
+          items.forEach((it) => b.extend({ lat: it.e.lat, lng: it.e.lng }));
+          map.fitBounds(b, 60);
+        }
+      }
+
+      regionSel.addEventListener('change', () => { fillSongs(); render(); });
+      yearSel.addEventListener('change', () => { fillSongs(); render(); });
+      songSel.addEventListener('change', render);
+      q.addEventListener('input', render);
+      fillSongs();
+      render();
+    }
+
+    start();
+  </script>
+</body>
+</html>
