@@ -45,12 +45,15 @@
     #newsBtn { font-size: 14px; padding: 4px 10px; }
     #news { width: min(640px, calc(100vw - 32px)); max-height: 80vh; border: 1px solid var(--line); border-radius: 6px; padding: 0; background: var(--bg); color: var(--fg); }
     #news::backdrop { background: rgba(0,0,0,.4); }
-    #news .head { display: flex; gap: 8px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); }
-    #news .head h2 { font-size: 16px; margin: 0; flex: 1; }
+    #news .head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); }
+    #news .head h2 { font-size: 16px; margin: 0; flex: 1; min-width: 10em; }
+    #news .tools { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; width: 100%; font-size: 13px; }
     #news ul { list-style: none; margin: 0; padding: 0; }
-    #news li { padding: 8px 16px; border-bottom: 1px solid var(--line); font-size: 14px; }
-    #news .at { color: var(--sub); font-size: 12px; }
+    #news li { display: flex; gap: 10px; padding: 6px 16px; border-bottom: 1px solid var(--line); font-size: 14px; line-height: 1.5; }
+    #news .at { color: var(--sub); font-size: 12px; flex: none; width: 3.2em; padding-top: 2px; }
+    #news .key { font-weight: bold; }
     #news .note { color: var(--sub); font-size: 12px; padding: 8px 16px; margin: 0; }
+    #newsMore { display: block; margin: 10px auto 14px; font-size: 14px; padding: 4px 16px; }
     .pin { display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.4)); cursor: pointer; }
   </style>
 </head>
@@ -66,10 +69,14 @@
   </header>
   <dialog id="news" aria-labelledby="newsTitle">
     <div class="head"><h2 id="newsTitle">お知らせ・更新履歴</h2>
-      <input id="newsQ" type="search" placeholder="番号（C0001 など）で探す" aria-label="番号で探す">
-      <button id="newsClose" type="button">閉じる</button></div>
-    <p class="note">掲載・更新・中止・延期・取り下げを、新しい順に載せています。番号は地図の吹き出しにある「番号」です。</p>
+      <button id="newsClose" type="button">閉じる</button>
+      <div class="tools">
+        <label><input id="newsAll" type="checkbox"> 掲載・更新もすべて表示</label>
+        <input id="newsQ" type="search" placeholder="番号（C0001 など）で探す" aria-label="番号で探す">
+      </div></div>
+    <p class="note" id="newsNote"></p>
     <ul id="newsList"></ul>
+    <button id="newsMore" type="button" hidden>もっと見る</button>
   </dialog>
   <main>
     <div id="map"></div>
@@ -240,21 +247,36 @@
     }
 
     // お知らせ・更新履歴（地図のデータと一緒に届く）
+    // お知らせ・更新履歴（地図のデータと一緒に届く）。
+    // 最初は中止・延期・取り下げなど大事なものだけ。「すべて表示」で掲載・更新も。30件ずつ出す
+    const NEWS_KEY = ['中止', '延期', '予定どおり', '取り下げ', '再掲載', '削除'];
+    const NEWS_STEP = 30;
     function setupNews(history) {
       const dlg = document.getElementById('news');
       const listEl = document.getElementById('newsList');
       const qEl = document.getElementById('newsQ');
+      const allEl = document.getElementById('newsAll');
+      const moreEl = document.getElementById('newsMore');
+      const noteEl = document.getElementById('newsNote');
+      let limit = NEWS_STEP;
       const draw = () => {
         const key = qEl.value.trim().toUpperCase();
-        const rows = history.filter((h) => !key || h.ref.toUpperCase().includes(key) || h.text.toUpperCase().includes(key));
+        // 番号で探すときは種類で絞らない（その番号に起きたことを全部見せる）
+        const rows = history.filter((h) => (key ? h.ref.toUpperCase().includes(key) || h.text.toUpperCase().includes(key) : allEl.checked || NEWS_KEY.includes(h.what)));
+        noteEl.textContent = key ? '「' + qEl.value.trim() + '」のお知らせ（' + rows.length + '件）'
+          : allEl.checked ? '掲載・更新・中止・延期・取り下げを、新しい順に載せています（' + rows.length + '件）。'
+          : '中止・延期・取り下げなどを、新しい順に載せています（' + rows.length + '件）。番号は地図の吹き出しにある「番号」です。';
         listEl.innerHTML = rows.length
-          ? rows.map((h) => `<li><div class="at">${esc(h.at)}</div>${esc(h.text)}</li>`).join('')
-          : '<li>' + (history.length ? '当てはまるお知らせがありません。' : 'まだお知らせはありません。') + '</li>';
+          ? rows.slice(0, limit).map((h) => `<li><span class="at">${esc(md(h.at))}</span><span${NEWS_KEY.includes(h.what) ? ' class="key"' : ''}>${esc(h.text)}</span></li>`).join('')
+          : '<li>' + (key ? '当てはまるお知らせがありません。' : 'まだお知らせはありません。') + '</li>';
+        moreEl.hidden = rows.length <= limit;
       };
-      qEl.addEventListener('input', draw);
-      document.getElementById('newsBtn').addEventListener('click', () => { draw(); dlg.showModal(); });
+      const reset = () => { limit = NEWS_STEP; draw(); };
+      qEl.addEventListener('input', reset);
+      allEl.addEventListener('change', reset);
+      moreEl.addEventListener('click', () => { limit += NEWS_STEP; draw(); });
+      document.getElementById('newsBtn').addEventListener('click', () => { reset(); dlg.showModal(); });
       document.getElementById('newsClose').addEventListener('click', () => dlg.close());
-      draw();
     }
 
     start();
