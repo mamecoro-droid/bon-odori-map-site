@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>盆踊り、民謡流し情報</title>
   <meta name="description" content="盆踊り・民謡流しの日程と場所、セットリストの地図。まず新潟県から。">
+  <!-- 近いピンを数字の丸にまとめる部品（Google マップ公式） -->
+  <script src="https://cdn.jsdelivr.net/npm/@googlemaps/markerclusterer@2.5.3/dist/index.min.js"></script>
   <style>
     :root { --bg: #fff; --fg: #222; --sub: #666; --line: #ddd; --accent: #b03a2e; }
     @media (prefers-color-scheme: dark) { :root { --bg: #1b1b1b; --fg: #eee; --sub: #aaa; --line: #333; --accent: #e07a6e; } }
@@ -21,9 +23,16 @@
     #list { width: 320px; overflow-y: auto; border-left: 1px solid var(--line); margin: 0; padding: 0; list-style: none; }
     #list li { padding: 10px 16px; border-bottom: 1px solid var(--line); cursor: pointer; }
     #list li:hover { background: rgba(127,127,127,.1); }
-    #list .d { font-size: 13px; color: var(--accent); }
-    #list .n { font-weight: bold; }
-    #list .p { font-size: 12px; color: var(--sub); }
+    #list li { padding: 7px 16px; }
+    #list .l1 { display: flex; gap: 8px; align-items: baseline; }
+    #list .d { font-size: 13px; color: var(--accent); flex: none; font-weight: bold; }
+    #list .n { font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #list .p { font-size: 12px; color: var(--sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #list li.sec { cursor: default; font-size: 12px; font-weight: bold; color: var(--sub); background: rgba(127,127,127,.08); padding: 4px 16px; }
+    #list li.sec:hover { background: rgba(127,127,127,.08); }
+    #list li.past { opacity: .55; }
+    #list .p .stat { margin: 0 6px 0 0; }
+    .cluster { display: flex; align-items: center; justify-content: center; border-radius: 50%; background: #b03a2e; color: #fff; font-weight: bold; font-size: 13px; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.4); cursor: pointer; }
     #empty { padding: 16px; color: var(--sub); font-size: 14px; cursor: default; }
     @media (max-width: 700px) {
       main { flex-direction: column; }
@@ -163,6 +172,23 @@
       });
       const info = new InfoWindow();
       let markers = [];
+      // 近いピンは「12」のような丸にまとめる。押すとそこを拡大して、ピンに分かれる
+      const clusterer = new markerClusterer.MarkerClusterer({
+        map,
+        renderer: {
+          render: ({ count, position }) => {
+            const d = document.createElement('div');
+            const size = count < 10 ? 34 : count < 100 ? 40 : 48;
+            d.className = 'cluster';
+            d.style.width = d.style.height = size + 'px';
+            d.textContent = count;
+            return new AdvancedMarkerElement({ position, content: d, title: count + '件', zIndex: 1000 + count });
+          },
+        },
+      });
+      // 今日（日本時間）。これより前に終わった回は「終わった回」
+      const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
+      const isPast = (t) => (t.end || t.start) < today;
 
       const regionSel = document.getElementById('region');
       const yearSel = document.getElementById('year');
@@ -190,13 +216,20 @@
         songSel.value = ids.includes(keep) ? keep : '';
       }
 
-      function open(it) {
+      // ピンから開くときはピンに付ける。一覧から開くときは、ピンが丸にまとまっていることがあるので場所で開く
+      function open(it, fromList) {
         info.setContent(popup(it.e, it.times));
-        info.open({ anchor: it.m, map });
+        if (fromList) {
+          info.setOptions({ position: { lat: it.e.lat, lng: it.e.lng }, pixelOffset: new google.maps.Size(0, -40) });
+          info.open({ map });
+        } else {
+          info.setOptions({ pixelOffset: null });
+          info.open({ anchor: it.m, map });
+        }
       }
 
       function render() {
-        markers.forEach((m) => { m.map = null; });
+        clusterer.clearMarkers();
         markers = [];
         info.close();
         const key = hira(q.value);
@@ -210,24 +243,35 @@
             const text = [e.name, e.venue, e.pref, e.city, e.area, e.areaYomi].concat(...times.map((t) => t.songs.map((s) => s.name + s.yomi))).join(' ');
             if (!hira(text).includes(key)) continue;
           }
-          const m = new AdvancedMarkerElement({ map, position: { lat: e.lat, lng: e.lng }, content: pinEl(), title: e.name, gmpClickable: true });
-          const it = { e, times, latest: times[0], m };
+          const m = new AdvancedMarkerElement({ position: { lat: e.lat, lng: e.lng }, content: pinEl(), title: e.name, gmpClickable: true });
+          // 一覧に出す回: これからの回があればいちばん近いもの、なければいちばん新しい回
+          const next = times.filter((t) => !isPast(t)).sort((a, b) => a.start.localeCompare(b.start))[0];
+          const it = { e, times, latest: next || times[0], m };
+          it.past = !next;
           m.addEventListener('gmp-click', () => open(it));
           markers.push(m);
           items.push(it);
         }
-        // 一覧は日付順（月日で並べる）
-        items.sort((a, b) => a.latest.start.slice(5).localeCompare(b.latest.start.slice(5)) || a.e.name.localeCompare(b.e.name, 'ja'));
+        clusterer.addMarkers(markers);
+        // 一覧: これからの回（日にちの近い順）を上に、終わった回（新しい順）を下にまとめて薄く
+        const coming = items.filter((it) => !it.past).sort((a, b) => a.latest.start.localeCompare(b.latest.start) || a.e.name.localeCompare(b.e.name, 'ja'));
+        const past = items.filter((it) => it.past).sort((a, b) => b.latest.start.localeCompare(a.latest.start) || a.e.name.localeCompare(b.e.name, 'ja'));
+        const ordered = coming.concat(past);
+        // 1行目に日にちと名前、2行目に場所。年をまたいで見ているとき（すべての年）は年も付ける
+        const shortDate = (t) => (yearSel.value ? '' : t.year + '/') + md(t.start) + (t.end && t.end !== t.start ? '〜' + md(t.end) : '');
+        const row = (it) => `<li data-i="${ordered.indexOf(it)}"${it.past ? ' class="past"' : ''}>` +
+          `<div class="l1"><span class="d">${esc(shortDate(it.latest))}</span><span class="n">${esc(it.e.name)}</span></div>` +
+          `<div class="p">${stat(it.latest)}${esc([it.e.venue, place(it.e)].filter(Boolean).join('・'))}</div></li>`;
         const list = document.getElementById('list');
         list.innerHTML = items.length
-          ? items.map((it, i) => `<li data-i="${i}"><div class="d">${esc(period(it.latest))}${stat(it.latest)}</div>` +
-              `<div class="n">${esc(it.e.name)}</div><div class="p">${esc([it.e.venue, place(it.e)].filter(Boolean).join('・'))}</div></li>`).join('')
+          ? (coming.length && past.length ? '<li class="sec">これから</li>' : '') + coming.map(row).join('') +
+            (past.length ? '<li class="sec">終わった回</li>' + past.map(row).join('') : '')
           : '<li id="empty">' + (DATA.events.length ? '当てはまる情報がありません。' : 'まだ情報が登録されていません。') + '</li>';
         list.querySelectorAll('li[data-i]').forEach((li) => li.addEventListener('click', () => {
-          const it = items[li.dataset.i];
+          const it = ordered[li.dataset.i];
           map.panTo({ lat: it.e.lat, lng: it.e.lng });
           map.setZoom(15);
-          open(it);
+          open(it, true);
         }));
         countEl.textContent = items.length + '件';
         if (items.length === 1) { map.setCenter({ lat: items[0].e.lat, lng: items[0].e.lng }); map.setZoom(13); }
