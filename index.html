@@ -18,7 +18,10 @@
     select, input { font-size: 15px; padding: 4px 8px; max-width: 100%; }
     h1 { flex: 1 1 auto; }
     #q { flex: 1 1 180px; min-width: 0; max-width: 280px; }
-    #count { color: var(--sub); font-size: 13px; }
+    #cond { display: flex; gap: 8px 14px; flex-wrap: wrap; align-items: baseline; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line);
+      background: rgba(127,127,127,.08); color: var(--fg); font: inherit; font-size: 13px; padding: 6px 16px; cursor: pointer; }
+    #cond b { color: var(--accent); }
+    #count { color: var(--sub); margin-left: auto; }
     header button { font-size: 14px; padding: 4px 10px; }
     #filterBtn.on { border-color: var(--accent); }
     main { flex: 1; display: flex; min-height: 0; }
@@ -87,8 +90,9 @@
     <input id="q" type="search" placeholder="名前・地名・曲名で探す" aria-label="探す">
     <button id="filterBtn" type="button">絞り込み</button>
     <button id="newsBtn" type="button">お知らせ</button>
-    <span id="count">読み込み中…</span>
   </header>
+  <!-- 今の条件（地域・時期）。いつも見出しの下に出す。押すと絞り込みが開く -->
+  <button id="cond" type="button" aria-label="今の条件（押すと絞り込み）"><span id="condText">読み込み中…</span><span id="count"></span></button>
   <dialog id="filter" class="modal" aria-labelledby="filterTitle">
     <div class="head"><h2 id="filterTitle">絞り込み</h2>
       <button id="filterClose" type="button">閉じる</button></div>
@@ -181,7 +185,7 @@
         const res = await fetch(DATA_URL);
         DATA = await res.json();
       } catch (err) {
-        countEl.textContent = '情報を読み込めませんでした。時間をおいて再読み込みしてください。';
+        document.getElementById('condText').textContent = '情報を読み込めませんでした。時間をおいて再読み込みしてください。';
         return;
       }
       setupNews(DATA.history || []);
@@ -322,7 +326,10 @@
         // 見出しに今の条件を出す（はじめの条件と違えば、絞り込みボタンに印）
         const changed = yearSel.value !== DEFAULTS.year || regionSel.value !== DEFAULTS.region || songSel.value !== DEFAULTS.song;
         document.getElementById('filterBtn').classList.toggle('on', changed);
-        countEl.textContent = [yearSel.options[yearSel.selectedIndex].text, regionSel.value, songSel.value ? songSel.options[songSel.selectedIndex].text.replace(/（\d+）$/, '') : ''].filter(Boolean).join('・') + ' ' + items.length + '件';
+        const periodText = yearSel.options[yearSel.selectedIndex].text + (yearSel.value === 'near' ? '（' + md(nearFrom) + '〜' + md(nearTo) + '）' : '');
+        document.getElementById('condText').innerHTML = `地域 <b>${esc(regionSel.value)}</b>　時期 <b>${esc(periodText)}</b>` +
+          (songSel.value ? `　曲 <b>${esc(songSel.options[songSel.selectedIndex].text.replace(/（\d+）$/, ''))}</b>` : '');
+        countEl.textContent = items.length + '件';
         if (items.length === 1) { map.setCenter({ lat: items[0].e.lat, lng: items[0].e.lng }); map.setZoom(13); }
         else if (items.length) {
           const b = new LatLngBounds();
@@ -338,6 +345,7 @@
       const filterDlg = document.getElementById('filter');
       setupModal(filterDlg);
       document.getElementById('filterBtn').addEventListener('click', () => openModal(filterDlg));
+      document.getElementById('cond').addEventListener('click', () => openModal(filterDlg));
       document.getElementById('filterClose').addEventListener('click', () => closeModal(filterDlg));
       document.getElementById('filterOk').addEventListener('click', () => closeModal(filterDlg));
       document.getElementById('filterReset').addEventListener('click', () => {
