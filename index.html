@@ -41,6 +41,12 @@
     .cluster { display: flex; align-items: center; justify-content: center; border-radius: 50%; background: #b03a2e; color: #fff; font-weight: bold; font-size: 13px; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.4); cursor: pointer; }
     #empty { padding: 16px; color: var(--sub); font-size: 14px; cursor: default; }
     @media (max-width: 700px) {
+      /* スマホ: 1行目に題名、2行目に検索・絞り込み・お知らせ */
+      header { padding: 6px 12px; gap: 6px 8px; }
+      h1 { flex-basis: 100%; font-size: 16px; }
+      #q { flex-basis: 80px; max-width: none; font-size: 16px; }
+      header button { padding: 4px 8px; }
+      #cond { padding: 5px 12px; }
       main { flex-direction: column; }
       #map { min-height: 55vh; }
       #list { width: auto; border-left: 0; border-top: 1px solid var(--line); max-height: 45vh; }
