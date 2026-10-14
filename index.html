@@ -39,6 +39,8 @@
     .pop .songs { margin: 4px 0; padding-left: 1.4em; }
     .pop .cmt { white-space: pre-wrap; margin: 4px 0; }
     .pop .sub { color: #666; font-size: 12px; }
+    .stat { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 3px; background: #555; color: #fff; font-size: 12px; font-weight: bold; }
+    .pop .off .when { text-decoration: line-through; opacity: .6; }
     .pin { display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.4)); cursor: pointer; }
   </style>
 </head>
@@ -73,6 +75,9 @@
     const md = (s) => Number(s.slice(5, 7)) + '/' + Number(s.slice(8, 10));
     const hours = (t) => (t.startTime || t.endTime ? ' ' + (t.startTime || '') + '〜' + (t.endTime || '') : '');
     const period = (t) => t.year + '年 ' + md(t.start) + (t.end && t.end !== t.start ? '〜' + md(t.end) : '') + hours(t);
+    // 中止・延期の印（「中止（10/20 更新）」）と、最終更新
+    const stat = (t) => (t.status ? `<span class="stat">${esc(t.status + (t.statusAt ? '（' + md(t.statusAt) + ' 更新）' : ''))}</span>` : '');
+    const updated = (t) => (t.updated ? `<span class="sub">最終更新 ${esc(md(t.updated))}</span><br>` : '');
     const place = (e) => [e.pref, e.city, e.area + (e.area && e.areaYomi ? '（' + e.areaYomi + '）' : '')].filter(Boolean).join(' ');
     const link = (u, text) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(text)}</a>`;
 
@@ -93,12 +98,13 @@
       return `<div class="pop"><b>${esc(e.name)}</b><br>` + (e.venue ? `<span class="venue">${esc(e.venue)}</span><br>` : '') + `<span class="sub">${esc(place(e))}</span>` +
         (e.urls.length ? '<br>' + e.urls.map((u, i) => link(u, '関連HP' + (e.urls.length > 1 ? i + 1 : ''))).join(' ・ ') : '') +
         `<br>${link(gmapsUrl(e), 'Google マップで開く')}` +
-        times.map((t) => `<div class="time"><span class="when">${esc(period(t))}</span>` +
+        times.map((t) => `<div class="time${t.status === '中止' ? ' off' : ''}"><span class="when">${esc(period(t))}</span>${stat(t)}` +
           (t.songs.length ? '<ol class="songs">' + t.songs.map((s) =>
             `<li>${esc(s.name)}${s.dance ? ' <span class="sub">（' + esc(s.dance) + '）</span>' : ''}${s.video ? ' ' + link(s.video, '動画') : ''}</li>`).join('') + '</ol>' : '') +
           (t.comment ? `<div class="cmt">${esc(t.comment)}</div>` : '') +
           (t.urls.length ? t.urls.map((u, i) => link(u, '情報元' + (t.urls.length > 1 ? i + 1 : ''))).join(' ・ ') + '<br>' : '') +
-          (t.provider ? `<span class="sub">情報提供: ${esc(t.provider)}</span>` : '') +
+          (t.provider ? `<span class="sub">情報提供: ${esc(t.provider)}</span><br>` : '') +
+          updated(t) +
           '</div>').join('') + '</div>';
     }
 
@@ -179,7 +185,7 @@
         items.sort((a, b) => a.latest.start.slice(5).localeCompare(b.latest.start.slice(5)) || a.e.name.localeCompare(b.e.name, 'ja'));
         const list = document.getElementById('list');
         list.innerHTML = items.length
-          ? items.map((it, i) => `<li data-i="${i}"><div class="d">${esc(period(it.latest))}</div>` +
+          ? items.map((it, i) => `<li data-i="${i}"><div class="d">${esc(period(it.latest))}${stat(it.latest)}</div>` +
               `<div class="n">${esc(it.e.name)}</div><div class="p">${esc([it.e.venue, place(it.e)].filter(Boolean).join('・'))}</div></li>`).join('')
           : '<li id="empty">' + (DATA.events.length ? '当てはまる情報がありません。' : 'まだ情報が登録されていません。') + '</li>';
         list.querySelectorAll('li[data-i]').forEach((li) => li.addEventListener('click', () => {
