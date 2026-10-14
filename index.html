@@ -16,8 +16,11 @@
     header { display: flex; gap: 8px 12px; align-items: center; flex-wrap: wrap; padding: 8px 16px; border-bottom: 1px solid var(--line); }
     h1 { font-size: 18px; margin: 0; }
     select, input { font-size: 15px; padding: 4px 8px; max-width: 100%; }
-    #q { width: 220px; }
+    h1 { flex: 1 1 auto; }
+    #q { flex: 1 1 180px; min-width: 0; max-width: 280px; }
     #count { color: var(--sub); font-size: 13px; }
+    header button { font-size: 14px; padding: 4px 10px; }
+    #filterBtn.on { border-color: var(--accent); }
     main { flex: 1; display: flex; min-height: 0; }
     #map { flex: 1; }
     #list { width: 320px; overflow-y: auto; border-left: 1px solid var(--line); margin: 0; padding: 0; list-style: none; }
@@ -51,14 +54,14 @@
     .stat { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 3px; background: #555; color: #fff; font-size: 12px; font-weight: bold; }
     .pop .off .when { text-decoration: line-through; opacity: .6; }
     .pop .no { color: #888; font-size: 11px; margin-left: 4px; }
-    #newsBtn { font-size: 14px; padding: 4px 10px; }
-    #news { width: min(640px, calc(100vw - 32px)); max-height: 80vh; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--line); border-radius: 6px; padding: 0; background: var(--bg); color: var(--fg); }
-    /* お知らせを開いている間は、後ろの地図・一覧が指やホイールで動かないようにする */
-    html.news-open, html.news-open body { overflow: hidden; overscroll-behavior: none; }
-    html.news-open main { pointer-events: none; touch-action: none; }
-    #news::backdrop { background: rgba(0,0,0,.4); }
-    #news .head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); }
-    #news .head h2 { font-size: 16px; margin: 0; flex: 1; min-width: 10em; }
+    /* 枠（お知らせ・絞り込み） */
+    .modal { width: min(640px, calc(100vw - 32px)); max-height: 80vh; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--line); border-radius: 6px; padding: 0; background: var(--bg); color: var(--fg); }
+    .modal::backdrop { background: rgba(0,0,0,.4); }
+    /* 枠を開いている間は、後ろの地図・一覧が指やホイールで動かないようにする */
+    html.modal-open, html.modal-open body { overflow: hidden; overscroll-behavior: none; }
+    html.modal-open main { pointer-events: none; touch-action: none; }
+    .modal .head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); }
+    .modal .head h2 { font-size: 16px; margin: 0; flex: 1; min-width: 10em; }
     #news .tools { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; width: 100%; font-size: 13px; }
     #news ul { list-style: none; margin: 0; padding: 0; }
     #news li { display: flex; gap: 10px; padding: 6px 16px; border-bottom: 1px solid var(--line); font-size: 14px; line-height: 1.5; }
@@ -68,20 +71,35 @@
     #news .note { color: var(--sub); font-size: 12px; padding: 8px 16px; margin: 0; }
     #newsMore { display: block; margin: 10px auto 14px; font-size: 14px; padding: 4px 16px; }
     #newsMore[hidden] { display: none; }
+    #filter { width: min(420px, calc(100vw - 32px)); }
+    #filter .body { padding: 12px 16px 16px; display: grid; gap: 14px; }
+    #filter label { display: grid; gap: 4px; font-size: 13px; color: var(--sub); }
+    #filter select { font-size: 16px; padding: 8px; width: 100%; }
+    #filter .row { display: flex; gap: 8px; justify-content: space-between; }
+    #filter .row button { font-size: 15px; padding: 8px 14px; }
+    #emptyWide { margin-top: 8px; font-size: 14px; padding: 4px 12px; }
     .pin { display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.4)); cursor: pointer; }
   </style>
 </head>
 <body>
   <header>
     <h1>盆踊り、民謡流し情報</h1>
-    <select id="region" aria-label="地域"></select>
-    <select id="year" aria-label="年"></select>
-    <select id="song" aria-label="曲"></select>
-    <input id="q" type="search" placeholder="名前・地名・曲名で探す（ひらがな可）" aria-label="探す">
+    <input id="q" type="search" placeholder="名前・地名・曲名で探す" aria-label="探す">
+    <button id="filterBtn" type="button">絞り込み</button>
+    <button id="newsBtn" type="button">お知らせ</button>
     <span id="count">読み込み中…</span>
-    <button id="newsBtn" type="button">お知らせ・更新履歴</button>
   </header>
-  <dialog id="news" aria-labelledby="newsTitle">
+  <dialog id="filter" class="modal" aria-labelledby="filterTitle">
+    <div class="head"><h2 id="filterTitle">絞り込み</h2>
+      <button id="filterClose" type="button">閉じる</button></div>
+    <div class="body">
+      <label>時期<select id="year"></select></label>
+      <label>地域<select id="region"></select></label>
+      <label>曲<select id="song"></select></label>
+      <div class="row"><button id="filterReset" type="button">はじめの条件に戻す</button><button id="filterOk" type="button">この条件で見る</button></div>
+    </div>
+  </dialog>
+  <dialog id="news" class="modal" aria-labelledby="newsTitle">
     <div class="head"><h2 id="newsTitle">お知らせ・更新履歴</h2>
       <button id="newsClose" type="button">閉じる</button>
       <div class="tools">
@@ -202,11 +220,28 @@
       regionSel.innerHTML = Object.keys(DATA.regions).map((r) => `<option>${esc(r)}</option>`).join('');
       regionSel.value = DATA.defaultRegion;
       // 最初は「すべての年」。これからの回が上に並ぶので、今年の残りと来年の予定が一度に見える
-      yearSel.innerHTML = '<option value="">すべての年</option>' + DATA.years.map((y) => `<option value="${y}">${y}年</option>`).join('');
-      yearSel.value = '';
+      // 時期: 最初は「前後1か月」（今日の1か月前〜1か月後に開かれる回）
+      const PERIODS = { near: '前後1か月', coming: 'これから（全部）', '': 'すべて' };
+      yearSel.innerHTML = Object.entries(PERIODS).map(([v, t]) => `<option value="${v}">${t}</option>`).join('') +
+        DATA.years.map((y) => `<option value="${y}">${y}年</option>`).join('');
+      const DEFAULTS = { year: 'near', region: DATA.defaultRegion, song: '' };
+      yearSel.value = DEFAULTS.year;
+      const shiftMonth = (ymd, n) => {
+        const d = new Date(ymd + 'T00:00:00Z');
+        d.setUTCMonth(d.getUTCMonth() + n);
+        return d.toISOString().slice(0, 10);
+      };
+      const nearFrom = shiftMonth(today, -1);
+      const nearTo = shiftMonth(today, 1);
 
       const inRegion = (e) => !DATA.regions[regionSel.value] || DATA.regions[regionSel.value].includes(e.pref);
-      const timesOf = (e) => e.times.filter((t) => !yearSel.value || String(t.year) === yearSel.value);
+      const inPeriod = (t) => {
+        const v = yearSel.value;
+        if (v === 'near') return t.start <= nearTo && (t.end || t.start) >= nearFrom;
+        if (v === 'coming') return (t.end || t.start) >= today;
+        return !v || String(t.year) === v;
+      };
+      const timesOf = (e) => e.times.filter(inPeriod);
 
       // 曲の一覧: 今の地域・年のセットリストに出てくる曲（辞書で決まった曲だけ）。多い順
       function fillSongs() {
@@ -265,7 +300,7 @@
         const past = items.filter((it) => it.past).sort((a, b) => b.latest.start.localeCompare(a.latest.start) || a.e.name.localeCompare(b.e.name, 'ja'));
         const ordered = coming.concat(past);
         // 1行目に日にちと名前、2行目に場所。年をまたいで見ているとき（すべての年）は年も付ける
-        const shortDate = (t) => (yearSel.value ? '' : t.year + '/') + md(t.start) + (t.end && t.end !== t.start ? '〜' + md(t.end) : '');
+        const shortDate = (t) => (/^\d{4}$/.test(yearSel.value) ? '' : t.year + '/') + md(t.start) + (t.end && t.end !== t.start ? '〜' + md(t.end) : '');
         const row = (it) => `<li data-i="${ordered.indexOf(it)}"${it.past ? ' class="past"' : ''}>` +
           `<div class="l1"><span class="d">${esc(shortDate(it.latest))}</span><span class="n">${esc(it.e.name)}</span></div>` +
           `<div class="p">${stat(it.latest)}${esc([it.e.venue, place(it.e)].filter(Boolean).join('・'))}</div></li>`;
@@ -273,14 +308,21 @@
         list.innerHTML = items.length
           ? (coming.length && past.length ? '<li class="sec">これから</li>' : '') + coming.map(row).join('') +
             (past.length ? '<li class="sec">終わった回</li>' + past.map(row).join('') : '')
-          : '<li id="empty">' + (DATA.events.length ? '当てはまる情報がありません。' : 'まだ情報が登録されていません。') + '</li>';
+          : '<li id="empty">' + (!DATA.events.length ? 'まだ情報が登録されていません。'
+            : yearSel.value === 'near' ? '前後1か月に開かれる情報はありません。<br><button id="emptyWide" type="button">これからの情報を全部見る</button>'
+            : '当てはまる情報がありません。') + '</li>';
+        const wide = document.getElementById('emptyWide');
+        if (wide) wide.addEventListener('click', () => { yearSel.value = 'coming'; fillSongs(); render(); });
         list.querySelectorAll('li[data-i]').forEach((li) => li.addEventListener('click', () => {
           const it = ordered[li.dataset.i];
           map.panTo({ lat: it.e.lat, lng: it.e.lng });
           map.setZoom(15);
           open(it, true);
         }));
-        countEl.textContent = items.length + '件';
+        // 見出しに今の条件を出す（はじめの条件と違えば、絞り込みボタンに印）
+        const changed = yearSel.value !== DEFAULTS.year || regionSel.value !== DEFAULTS.region || songSel.value !== DEFAULTS.song;
+        document.getElementById('filterBtn').classList.toggle('on', changed);
+        countEl.textContent = [yearSel.options[yearSel.selectedIndex].text, regionSel.value, songSel.value ? songSel.options[songSel.selectedIndex].text.replace(/（\d+）$/, '') : ''].filter(Boolean).join('・') + ' ' + items.length + '件';
         if (items.length === 1) { map.setCenter({ lat: items[0].e.lat, lng: items[0].e.lng }); map.setZoom(13); }
         else if (items.length) {
           const b = new LatLngBounds();
@@ -292,6 +334,19 @@
       regionSel.addEventListener('change', () => { fillSongs(); render(); });
       yearSel.addEventListener('change', () => { fillSongs(); render(); });
       songSel.addEventListener('change', render);
+      // 絞り込みの枠。選んだらすぐ地図に反映する（「この条件で見る」は閉じるだけ）
+      const filterDlg = document.getElementById('filter');
+      setupModal(filterDlg);
+      document.getElementById('filterBtn').addEventListener('click', () => openModal(filterDlg));
+      document.getElementById('filterClose').addEventListener('click', () => closeModal(filterDlg));
+      document.getElementById('filterOk').addEventListener('click', () => closeModal(filterDlg));
+      document.getElementById('filterReset').addEventListener('click', () => {
+        yearSel.value = DEFAULTS.year;
+        regionSel.value = DEFAULTS.region;
+        fillSongs();
+        songSel.value = DEFAULTS.song;
+        render();
+      });
       q.addEventListener('input', render);
       fillSongs();
       render();
@@ -300,6 +355,24 @@
     // お知らせ・更新履歴（地図のデータと一緒に届く）
     // お知らせ・更新履歴（地図のデータと一緒に届く）。
     // 最初は中止・延期・取り下げなど大事なものだけ。「すべて表示」で掲載・更新も。30件ずつ出す
+    // 枠を開く・閉じる。開いている間は後ろを止め、枠の外を押したら閉じる
+    // （閉じたときの close の合図は、タブが裏にあると遅れることがあるので、閉じる操作のときにすぐ戻す）
+    function closeModal(dlg) { dlg.close(); document.documentElement.classList.remove('modal-open'); }
+    function openModal(dlg) { document.documentElement.classList.add('modal-open'); dlg.showModal(); dlg.scrollTop = 0; }
+    function setupModal(dlg) {
+      const outside = (x, y) => {
+        const r = dlg.getBoundingClientRect();
+        return x < r.left || x > r.right || y < r.top || y > r.bottom;
+      };
+      dlg.addEventListener('close', () => document.documentElement.classList.remove('modal-open'));
+      dlg.addEventListener('click', (ev) => { if (outside(ev.clientX, ev.clientY)) closeModal(dlg); });
+      dlg.addEventListener('wheel', (ev) => { if (outside(ev.clientX, ev.clientY)) ev.preventDefault(); }, { passive: false });
+      dlg.addEventListener('touchmove', (ev) => {
+        const t = ev.touches[0];
+        if (t && outside(t.clientX, t.clientY)) ev.preventDefault();
+      }, { passive: false });
+    }
+
     const NEWS_KEY = ['中止', '延期', '予定どおり', '取り下げ', '再掲載', '削除'];
     const NEWS_STEP = 30;
     function setupNews(history) {
@@ -326,30 +399,9 @@
       qEl.addEventListener('input', reset);
       allEl.addEventListener('change', reset);
       moreEl.addEventListener('click', () => { limit += NEWS_STEP; draw(); });
-      document.getElementById('newsBtn').addEventListener('click', () => {
-        reset();
-        document.documentElement.classList.add('news-open');
-        dlg.showModal();
-        dlg.scrollTop = 0;
-      });
-      // 閉じたら後ろを動かせるように戻す。閉じる操作のときにすぐ戻し、Esc で閉じたときは close の合図で戻す
-      // （close の合図は、タブが裏にあると遅れることがあるので、それだけに頼らない）
-      const closeNews = () => { dlg.close(); document.documentElement.classList.remove('news-open'); };
-      document.getElementById('newsClose').addEventListener('click', closeNews);
-      dlg.addEventListener('close', () => document.documentElement.classList.remove('news-open'));
-      // 枠の外（暗いところ）かどうか
-      const outside = (x, y) => {
-        const r = dlg.getBoundingClientRect();
-        return x < r.left || x > r.right || y < r.top || y > r.bottom;
-      };
-      // 枠の外を押したら閉じる
-      dlg.addEventListener('click', (ev) => { if (outside(ev.clientX, ev.clientY)) closeNews(); });
-      // 枠の外でホイールや指を動かしても、後ろの地図に伝えない
-      dlg.addEventListener('wheel', (ev) => { if (outside(ev.clientX, ev.clientY)) ev.preventDefault(); }, { passive: false });
-      dlg.addEventListener('touchmove', (ev) => {
-        const t = ev.touches[0];
-        if (t && outside(t.clientX, t.clientY)) ev.preventDefault();
-      }, { passive: false });
+      setupModal(dlg);
+      document.getElementById('newsBtn').addEventListener('click', () => { reset(); openModal(dlg); });
+      document.getElementById('newsClose').addEventListener('click', () => closeModal(dlg));
     }
 
     start();
