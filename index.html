@@ -41,6 +41,16 @@
     .pop .sub { color: #666; font-size: 12px; }
     .stat { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 3px; background: #555; color: #fff; font-size: 12px; font-weight: bold; }
     .pop .off .when { text-decoration: line-through; opacity: .6; }
+    .pop .no { color: #888; font-size: 11px; margin-left: 4px; }
+    #newsBtn { font-size: 14px; padding: 4px 10px; }
+    #news { width: min(640px, calc(100vw - 32px)); max-height: 80vh; border: 1px solid var(--line); border-radius: 6px; padding: 0; background: var(--bg); color: var(--fg); }
+    #news::backdrop { background: rgba(0,0,0,.4); }
+    #news .head { display: flex; gap: 8px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); }
+    #news .head h2 { font-size: 16px; margin: 0; flex: 1; }
+    #news ul { list-style: none; margin: 0; padding: 0; }
+    #news li { padding: 8px 16px; border-bottom: 1px solid var(--line); font-size: 14px; }
+    #news .at { color: var(--sub); font-size: 12px; }
+    #news .note { color: var(--sub); font-size: 12px; padding: 8px 16px; margin: 0; }
     .pin { display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.4)); cursor: pointer; }
   </style>
 </head>
@@ -52,7 +62,15 @@
     <select id="song" aria-label="曲"></select>
     <input id="q" type="search" placeholder="名前・地名・曲名で探す（ひらがな可）" aria-label="探す">
     <span id="count">読み込み中…</span>
+    <button id="newsBtn" type="button">お知らせ・更新履歴</button>
   </header>
+  <dialog id="news" aria-labelledby="newsTitle">
+    <div class="head"><h2 id="newsTitle">お知らせ・更新履歴</h2>
+      <input id="newsQ" type="search" placeholder="番号（C0001 など）で探す" aria-label="番号で探す">
+      <button id="newsClose" type="button">閉じる</button></div>
+    <p class="note">掲載・更新・中止・延期・取り下げを、新しい順に載せています。番号は地図の吹き出しにある「番号」です。</p>
+    <ul id="newsList"></ul>
+  </dialog>
   <main>
     <div id="map"></div>
     <ul id="list"></ul>
@@ -76,7 +94,14 @@
     const hours = (t) => (t.startTime || t.endTime ? ' ' + (t.startTime || '') + '〜' + (t.endTime || '') : '');
     const period = (t) => t.year + '年 ' + md(t.start) + (t.end && t.end !== t.start ? '〜' + md(t.end) : '') + hours(t);
     // 中止・延期の印（「中止（10/20 更新）」）と、最終更新
-    const stat = (t) => (t.status ? `<span class="stat">${esc(t.status + (t.statusAt ? '（' + md(t.statusAt) + ' 更新）' : ''))}</span>` : '');
+    const ymdOrText = (s) => (/^\d{4}-\d{2}-\d{2}/.test(s) ? md(s) + s.slice(10) : s);
+    const stat = (t) => {
+      if (!t.status) return '';
+      const notes = [];
+      if (t.status === '延期') notes.push(t.postponedTo ? '→ ' + ymdOrText(t.postponedTo) : '日程未定');
+      if (t.statusAt) notes.push(md(t.statusAt) + ' 更新');
+      return `<span class="stat">${esc(t.status + (notes.length ? '（' + notes.join('・') + '）' : ''))}</span>`;
+    };
     const updated = (t) => (t.updated ? `<span class="sub">最終更新 ${esc(md(t.updated))}</span><br>` : '');
     const place = (e) => [e.pref, e.city, e.area + (e.area && e.areaYomi ? '（' + e.areaYomi + '）' : '')].filter(Boolean).join(' ');
     const link = (u, text) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(text)}</a>`;
@@ -105,6 +130,7 @@
           (t.urls.length ? t.urls.map((u, i) => link(u, '情報元' + (t.urls.length > 1 ? i + 1 : ''))).join(' ・ ') + '<br>' : '') +
           (t.provider ? `<span class="sub">情報提供: ${esc(t.provider)}</span><br>` : '') +
           updated(t) +
+          (t.id ? `<span class="sub">番号 ${esc(t.id)}</span>` : '') +
           '</div>').join('') + '</div>';
     }
 
@@ -118,6 +144,7 @@
         countEl.textContent = '情報を読み込めませんでした。時間をおいて再読み込みしてください。';
         return;
       }
+      setupNews(DATA.history || []);
       const { Map, InfoWindow } = await google.maps.importLibrary('maps');
       const { AdvancedMarkerElement } = await google.maps.importLibrary('marker');
       const { LatLngBounds } = await google.maps.importLibrary('core');
@@ -209,6 +236,24 @@
       q.addEventListener('input', render);
       fillSongs();
       render();
+    }
+
+    // お知らせ・更新履歴（地図のデータと一緒に届く）
+    function setupNews(history) {
+      const dlg = document.getElementById('news');
+      const listEl = document.getElementById('newsList');
+      const qEl = document.getElementById('newsQ');
+      const draw = () => {
+        const key = qEl.value.trim().toUpperCase();
+        const rows = history.filter((h) => !key || h.ref.toUpperCase().includes(key) || h.text.toUpperCase().includes(key));
+        listEl.innerHTML = rows.length
+          ? rows.map((h) => `<li><div class="at">${esc(h.at)}</div>${esc(h.text)}</li>`).join('')
+          : '<li>' + (history.length ? '当てはまるお知らせがありません。' : 'まだお知らせはありません。') + '</li>';
+      };
+      qEl.addEventListener('input', draw);
+      document.getElementById('newsBtn').addEventListener('click', () => { draw(); dlg.showModal(); });
+      document.getElementById('newsClose').addEventListener('click', () => dlg.close());
+      draw();
     }
 
     start();
