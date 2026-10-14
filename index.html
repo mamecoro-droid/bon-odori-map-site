@@ -196,7 +196,9 @@
       const q = document.getElementById('q');
       regionSel.innerHTML = Object.keys(DATA.regions).map((r) => `<option>${esc(r)}</option>`).join('');
       regionSel.value = DATA.defaultRegion;
-      yearSel.innerHTML = DATA.years.map((y) => `<option value="${y}">${y}年</option>`).join('') + '<option value="">すべての年</option>';
+      // 最初は「すべての年」。これからの回が上に並ぶので、今年の残りと来年の予定が一度に見える
+      yearSel.innerHTML = '<option value="">すべての年</option>' + DATA.years.map((y) => `<option value="${y}">${y}年</option>`).join('');
+      yearSel.value = '';
 
       const inRegion = (e) => !DATA.regions[regionSel.value] || DATA.regions[regionSel.value].includes(e.pref);
       const timesOf = (e) => e.times.filter((t) => !yearSel.value || String(t.year) === yearSel.value);
