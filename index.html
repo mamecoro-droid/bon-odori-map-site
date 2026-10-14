@@ -84,6 +84,9 @@
     #filter .body { padding: 12px 16px 16px; display: grid; gap: 14px; }
     #filter label { display: grid; gap: 4px; font-size: 13px; color: var(--sub); }
     #filter select { font-size: 16px; padding: 8px; width: 100%; }
+    #filter select:disabled { opacity: .5; }
+    #filter .hint { font-size: 12px; }
+    #filter .hint[hidden] { display: none; }
     #filter .row { display: flex; gap: 8px; justify-content: space-between; }
     #filter .row button { font-size: 15px; padding: 8px 14px; }
     #emptyWide { margin-top: 8px; font-size: 14px; padding: 4px 12px; }
@@ -104,6 +107,7 @@
       <button id="filterClose" type="button">閉じる</button></div>
     <div class="body">
       <label>時期<select id="year"></select></label>
+      <label>月<select id="month"></select><span class="hint" id="monthHint">時期を「これから」「すべて」や年にすると選べます</span></label>
       <label>地域<select id="region"></select></label>
       <label>曲<select id="song"></select></label>
       <div class="row"><button id="filterReset" type="button">はじめの条件に戻す</button><button id="filterOk" type="button">この条件で見る</button></div>
@@ -234,8 +238,29 @@
       const PERIODS = { near: '前後1か月', coming: 'これから（全部）', '': 'すべて' };
       yearSel.innerHTML = Object.entries(PERIODS).map(([v, t]) => `<option value="${v}">${t}</option>`).join('') +
         DATA.years.map((y) => `<option value="${y}">${y}年</option>`).join('');
-      const DEFAULTS = { year: 'near', region: DATA.defaultRegion, song: '' };
+      const DEFAULTS = { year: 'near', month: '', region: DATA.defaultRegion, song: '' };
       yearSel.value = DEFAULTS.year;
+      // 月: 時期（年・これから・すべて）の中を、さらに月で絞る。前後1か月のときは使わない
+      const monthSel = document.getElementById('month');
+      monthSel.innerHTML = '<option value="">すべての月</option>' + Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${i + 1}月</option>`).join('');
+      monthSel.value = DEFAULTS.month;
+      const syncMonth = () => {
+        monthSel.disabled = yearSel.value === 'near';
+        if (monthSel.disabled) monthSel.value = '';
+        document.getElementById('monthHint').hidden = !monthSel.disabled;
+      };
+      syncMonth();
+      // その回の期間（開始日〜終了日）に、選んだ月の日が入っているか
+      const inMonth = (t) => {
+        if (!monthSel.value) return true;
+        const m = Number(monthSel.value);
+        const from = new Date(t.start + 'T00:00:00Z');
+        const to = new Date((t.end || t.start) + 'T00:00:00Z');
+        for (let d = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), 1)); d <= to; d.setUTCMonth(d.getUTCMonth() + 1)) {
+          if (d.getUTCMonth() + 1 === m) return true;
+        }
+        return false;
+      };
       const shiftMonth = (ymd, n) => {
         const d = new Date(ymd + 'T00:00:00Z');
         d.setUTCMonth(d.getUTCMonth() + n);
@@ -251,7 +276,7 @@
         if (v === 'coming') return (t.end || t.start) >= today;
         return !v || String(t.year) === v;
       };
-      const timesOf = (e) => e.times.filter(inPeriod);
+      const timesOf = (e) => e.times.filter((t) => inPeriod(t) && inMonth(t));
 
       // 曲の一覧: 今の地域・年のセットリストに出てくる曲（辞書で決まった曲だけ）。多い順
       function fillSongs() {
@@ -322,7 +347,7 @@
             : yearSel.value === 'near' ? '前後1か月に開かれる情報はありません。<br><button id="emptyWide" type="button">これからの情報を全部見る</button>'
             : '当てはまる情報がありません。') + '</li>';
         const wide = document.getElementById('emptyWide');
-        if (wide) wide.addEventListener('click', () => { yearSel.value = 'coming'; fillSongs(); render(); });
+        if (wide) wide.addEventListener('click', () => { yearSel.value = 'coming'; syncMonth(); fillSongs(); render(); });
         list.querySelectorAll('li[data-i]').forEach((li) => li.addEventListener('click', () => {
           const it = ordered[li.dataset.i];
           map.panTo({ lat: it.e.lat, lng: it.e.lng });
@@ -330,9 +355,10 @@
           open(it, true);
         }));
         // 見出しに今の条件を出す（はじめの条件と違えば、絞り込みボタンに印）
-        const changed = yearSel.value !== DEFAULTS.year || regionSel.value !== DEFAULTS.region || songSel.value !== DEFAULTS.song;
+        const changed = yearSel.value !== DEFAULTS.year || monthSel.value !== DEFAULTS.month || regionSel.value !== DEFAULTS.region || songSel.value !== DEFAULTS.song;
         document.getElementById('filterBtn').classList.toggle('on', changed);
-        const periodText = yearSel.options[yearSel.selectedIndex].text + (yearSel.value === 'near' ? '（' + md(nearFrom) + '〜' + md(nearTo) + '）' : '');
+        const periodText = yearSel.options[yearSel.selectedIndex].text + (yearSel.value === 'near' ? '（' + md(nearFrom) + '〜' + md(nearTo) + '）' : '') +
+          (monthSel.value ? ' ' + monthSel.value + '月' : '');
         document.getElementById('condText').innerHTML = `地域 <b>${esc(regionSel.value)}</b>　時期 <b>${esc(periodText)}</b>` +
           (songSel.value ? `　曲 <b>${esc(songSel.options[songSel.selectedIndex].text.replace(/（\d+）$/, ''))}</b>` : '');
         countEl.textContent = items.length + '件';
@@ -345,7 +371,8 @@
       }
 
       regionSel.addEventListener('change', () => { fillSongs(); render(); });
-      yearSel.addEventListener('change', () => { fillSongs(); render(); });
+      yearSel.addEventListener('change', () => { syncMonth(); fillSongs(); render(); });
+      monthSel.addEventListener('change', () => { fillSongs(); render(); });
       songSel.addEventListener('change', render);
       // 絞り込みの枠。選んだらすぐ地図に反映する（「この条件で見る」は閉じるだけ）
       const filterDlg = document.getElementById('filter');
@@ -356,6 +383,8 @@
       document.getElementById('filterOk').addEventListener('click', () => closeModal(filterDlg));
       document.getElementById('filterReset').addEventListener('click', () => {
         yearSel.value = DEFAULTS.year;
+        monthSel.value = DEFAULTS.month;
+        syncMonth();
         regionSel.value = DEFAULTS.region;
         fillSongs();
         songSel.value = DEFAULTS.song;
