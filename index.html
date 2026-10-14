@@ -332,8 +332,10 @@
         dlg.showModal();
         dlg.scrollTop = 0;
       });
-      document.getElementById('newsClose').addEventListener('click', () => dlg.close());
-      // 閉じたら（閉じる・Esc・枠の外を押す）後ろを動かせるように戻す
+      // 閉じたら後ろを動かせるように戻す。閉じる操作のときにすぐ戻し、Esc で閉じたときは close の合図で戻す
+      // （close の合図は、タブが裏にあると遅れることがあるので、それだけに頼らない）
+      const closeNews = () => { dlg.close(); document.documentElement.classList.remove('news-open'); };
+      document.getElementById('newsClose').addEventListener('click', closeNews);
       dlg.addEventListener('close', () => document.documentElement.classList.remove('news-open'));
       // 枠の外（暗いところ）かどうか
       const outside = (x, y) => {
@@ -341,7 +343,7 @@
         return x < r.left || x > r.right || y < r.top || y > r.bottom;
       };
       // 枠の外を押したら閉じる
-      dlg.addEventListener('click', (ev) => { if (outside(ev.clientX, ev.clientY)) dlg.close(); });
+      dlg.addEventListener('click', (ev) => { if (outside(ev.clientX, ev.clientY)) closeNews(); });
       // 枠の外でホイールや指を動かしても、後ろの地図に伝えない
       dlg.addEventListener('wheel', (ev) => { if (outside(ev.clientX, ev.clientY)) ev.preventDefault(); }, { passive: false });
       dlg.addEventListener('touchmove', (ev) => {
