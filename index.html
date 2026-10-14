@@ -94,7 +94,8 @@
     const hours = (t) => (t.startTime || t.endTime ? ' ' + (t.startTime || '') + '〜' + (t.endTime || '') : '');
     const period = (t) => t.year + '年 ' + md(t.start) + (t.end && t.end !== t.start ? '〜' + md(t.end) : '') + hours(t);
     // 中止・延期の印（「中止（10/20 更新）」）と、最終更新
-    const ymdOrText = (s) => (/^\d{4}-\d{2}-\d{2}/.test(s) ? md(s) + s.slice(10) : s);
+    // 「2026-12-01」「2026/12/1」は「12/1」に。ほかの書き方はそのまま
+    const ymdOrText = (s) => String(s).replace(/^\d{4}[-\/](\d{1,2})[-\/](\d{1,2})/, (_, m, d) => Number(m) + '/' + Number(d));
     const stat = (t) => {
       if (!t.status) return '';
       const notes = [];
