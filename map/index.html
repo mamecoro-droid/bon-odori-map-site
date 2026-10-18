@@ -233,12 +233,11 @@
       const q = document.getElementById('q');
       regionSel.innerHTML = Object.keys(DATA.regions).map((r) => `<option>${esc(r)}</option>`).join('');
       regionSel.value = DATA.defaultRegion;
-      // 最初は「すべての年」。これからの回が上に並ぶので、今年の残りと来年の予定が一度に見える
-      // 時期: 最初は「前後1か月」（今日の1か月前〜1か月後に開かれる回）
+      // 時期: 最初は「これから（全部）」（今日以降に開かれる回）。地域は最初 新潟県（スプレッドシートの defaultRegion）
       const PERIODS = { near: '前後1か月', coming: 'これから（全部）', '': 'すべて' };
       yearSel.innerHTML = Object.entries(PERIODS).map(([v, t]) => `<option value="${v}">${t}</option>`).join('') +
         DATA.years.map((y) => `<option value="${y}">${y}年</option>`).join('');
-      const DEFAULTS = { year: 'near', month: '', region: DATA.defaultRegion, song: '' };
+      const DEFAULTS = { year: 'coming', month: '', region: DATA.defaultRegion, song: '' };
       yearSel.value = DEFAULTS.year;
       // 月: 時期（年・これから・すべて）の中を、さらに月で絞る。前後1か月のときは使わない
       const monthSel = document.getElementById('month');
