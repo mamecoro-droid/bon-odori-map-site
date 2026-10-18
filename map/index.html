@@ -24,11 +24,10 @@
     #count { color: var(--sub); margin-left: auto; }
     header button { font-size: 14px; padding: 4px 10px; }
     #filterBtn.on { border-color: var(--accent); }
-    /* 投稿フォームへのリンク（見出しと地図の上） */
+    /* 投稿フォームへのリンク（見出しと、一覧が空のとき） */
     .send { display: inline-block; background: var(--accent); color: #fff; text-decoration: none; font-size: 14px; font-weight: bold; border-radius: 4px; padding: 5px 12px; white-space: nowrap; }
     header .send { order: 1; }
     header .br { display: none; }
-    #mapSend { margin: 0 0 10px 10px; font-size: 15px; padding: 8px 14px; background: #b03a2e; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
     main { flex: 1; display: flex; min-height: 0; }
     #map { flex: 1; }
     #list { width: 320px; overflow-y: auto; border-left: 1px solid var(--line); margin: 0; padding: 0; list-style: none; }
@@ -144,7 +143,7 @@
     // 設定。地図のデータはスプレッドシート（Apps Script の ?format=json）から毎回読む
     const DATA_URL = 'https://script.google.com/macros/s/AKfycbyY3-EEqumnL44_i4nZ5XQrvUSBpWZtWadCpmKMAF9sXaRvMTy55PNorHDEwU9l8xXR7A/exec?format=json';
     // Google マップのキー（このサイト〈dobon.jp と mamecoro-droid.github.io〉でだけ使えるよう Google Cloud で制限してある）とマップID
-    // 情報の募集（Google フォームの回答用ページ）。見出しと地図の左下から開く
+    // 情報の募集（Google フォームの回答用ページ）。見出しと、一覧が空のときに出す
     const FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSdhEQcdzl_NrJvUWy1kXS3bBuBlpmdoQtpnplTkqDy3eh13Ug/viewform';
     const MAPS_KEY = 'AIzaSyAHAkcpmeySq2kS8S2GEiAFkSI7TzkL_fU';
     const MAP_ID = '854cacd97c179959c6edbae5';
@@ -220,14 +219,6 @@
         center: { lat: 37.5, lng: 138.8 }, zoom: 8, mapId: MAP_ID, // 新潟県あたり
         gestureHandling: 'greedy', streetViewControl: true, mapTypeControl: true, fullscreenControl: true,
       });
-      const mapSend = document.createElement('a');
-      mapSend.id = 'mapSend';
-      mapSend.className = 'send';
-      mapSend.href = FORM_URL;
-      mapSend.target = '_blank';
-      mapSend.rel = 'noopener';
-      mapSend.textContent = '盆踊りの情報を送る';
-      map.controls[google.maps.ControlPosition.LEFT_BOTTOM].push(mapSend);
       const info = new InfoWindow();
       let markers = [];
       // 近いピンは「12」のような丸にまとめる。押すとそこを拡大して、ピンに分かれる
