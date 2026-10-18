@@ -24,6 +24,11 @@
     #count { color: var(--sub); margin-left: auto; }
     header button { font-size: 14px; padding: 4px 10px; }
     #filterBtn.on { border-color: var(--accent); }
+    /* 投稿フォームへのリンク（見出しと地図の上） */
+    .send { display: inline-block; background: var(--accent); color: #fff; text-decoration: none; font-size: 14px; font-weight: bold; border-radius: 4px; padding: 5px 12px; white-space: nowrap; }
+    header .send { order: 1; }
+    header .br { display: none; }
+    #mapSend { margin: 0 0 10px 10px; font-size: 15px; padding: 8px 14px; background: #b03a2e; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
     main { flex: 1; display: flex; min-height: 0; }
     #map { flex: 1; }
     #list { width: 320px; overflow-y: auto; border-left: 1px solid var(--line); margin: 0; padding: 0; list-style: none; }
@@ -41,9 +46,12 @@
     .cluster { display: flex; align-items: center; justify-content: center; border-radius: 50%; background: #b03a2e; color: #fff; font-weight: bold; font-size: 13px; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.4); cursor: pointer; }
     #empty { padding: 16px; color: var(--sub); font-size: 14px; cursor: default; }
     @media (max-width: 700px) {
-      /* スマホ: 1行目に題名、2行目に検索・絞り込み・お知らせ */
+      /* スマホ: 1行目に題名と情報を送る、2行目に検索・絞り込み・お知らせ */
       header { padding: 6px 12px; gap: 6px 8px; }
-      h1 { flex-basis: 100%; font-size: 16px; }
+      h1 { flex: 1 1 0; font-size: 16px; }
+      /* スマホでは「情報を送る」を題名の右に。検索からは次の行 */
+      header .send { order: 0; padding: 4px 10px; font-size: 13px; }
+      header .br { display: block; flex-basis: 100%; height: 0; }
       #q { flex-basis: 80px; max-width: none; font-size: 16px; }
       header button { padding: 4px 8px; }
       #cond { padding: 5px 12px; }
@@ -96,9 +104,11 @@
 <body>
   <header>
     <h1>盆踊り、民謡流し情報</h1>
+    <span class="br"></span>
     <input id="q" type="search" placeholder="名前・地名・曲名で探す" aria-label="探す">
     <button id="filterBtn" type="button">絞り込み</button>
     <button id="newsBtn" type="button">お知らせ</button>
+    <a class="send" href="https://docs.google.com/forms/d/e/1FAIpQLSdhEQcdzl_NrJvUWy1kXS3bBuBlpmdoQtpnplTkqDy3eh13Ug/viewform" target="_blank" rel="noopener">情報を送る</a>
   </header>
   <!-- 今の条件（地域・時期）。いつも見出しの下に出す。押すと絞り込みが開く -->
   <button id="cond" type="button" aria-label="今の条件（押すと絞り込み）"><span id="condText">読み込み中…</span><span id="count"></span></button>
@@ -133,6 +143,8 @@
     // 設定。地図のデータはスプレッドシート（Apps Script の ?format=json）から毎回読む
     const DATA_URL = 'https://script.google.com/macros/s/AKfycbyY3-EEqumnL44_i4nZ5XQrvUSBpWZtWadCpmKMAF9sXaRvMTy55PNorHDEwU9l8xXR7A/exec?format=json';
     // Google マップのキー（このサイト〈dobon.jp と mamecoro-droid.github.io〉でだけ使えるよう Google Cloud で制限してある）とマップID
+    // 情報の募集（Google フォームの回答用ページ）。見出しと地図の左下から開く
+    const FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSdhEQcdzl_NrJvUWy1kXS3bBuBlpmdoQtpnplTkqDy3eh13Ug/viewform';
     const MAPS_KEY = 'AIzaSyAHAkcpmeySq2kS8S2GEiAFkSI7TzkL_fU';
     const MAP_ID = '854cacd97c179959c6edbae5';
 
@@ -207,6 +219,14 @@
         center: { lat: 37.5, lng: 138.8 }, zoom: 8, mapId: MAP_ID, // 新潟県あたり
         gestureHandling: 'greedy', streetViewControl: true, mapTypeControl: true, fullscreenControl: true,
       });
+      const mapSend = document.createElement('a');
+      mapSend.id = 'mapSend';
+      mapSend.className = 'send';
+      mapSend.href = FORM_URL;
+      mapSend.target = '_blank';
+      mapSend.rel = 'noopener';
+      mapSend.textContent = '盆踊りの情報を送る';
+      map.controls[google.maps.ControlPosition.LEFT_BOTTOM].push(mapSend);
       const info = new InfoWindow();
       let markers = [];
       // 近いピンは「12」のような丸にまとめる。押すとそこを拡大して、ピンに分かれる
@@ -344,7 +364,8 @@
             (past.length ? '<li class="sec">終わった回</li>' + past.map(row).join('') : '')
           : '<li id="empty">' + (!DATA.events.length ? 'まだ情報が登録されていません。'
             : yearSel.value === 'near' ? '前後1か月に開かれる情報はありません。<br><button id="emptyWide" type="button">これからの情報を全部見る</button>'
-            : '当てはまる情報がありません。') + '</li>';
+            : '当てはまる情報がありません。') +
+            `<br><a class="send" style="margin-top:12px" href="${FORM_URL}" target="_blank" rel="noopener">知っている盆踊りの情報を送る</a></li>`;
         const wide = document.getElementById('emptyWide');
         if (wide) wide.addEventListener('click', () => { yearSel.value = 'coming'; syncMonth(); fillSongs(); render(); });
         list.querySelectorAll('li[data-i]').forEach((li) => li.addEventListener('click', () => {
